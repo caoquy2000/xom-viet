@@ -1586,7 +1586,7 @@ button svg {
 .form-field .password-input input { border: 0; background: transparent; min-width: 0; }
 .password-input:focus-within { outline: 2px solid #ac8e22; outline-offset: 2px; }
 .password-input input:focus-visible { outline: none; }
-.form-help { margin: -.4rem 0 1rem; font-size: .875rem; color: #66635a; }
+.form-help { margin: .5rem 0 1rem; font-size: .875rem; color: #66635a; }
 .session-notice { padding: 1rem; background: #fff3dc; font-size: .875rem; border-radius: .75rem; margin-bottom: 1rem; }
 .session-notice button { margin-left: .5rem; text-decoration: underline; }
 @media(max-width: 720px) { .brand-subtitle, .register-button { display: none; } .account-name { max-width: 6rem; } }

@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { resolve, extname, sep } from "node:path";
+import { createGateway } from "../infrastructure/sites/gateway.mjs";
 const require = createRequire(import.meta.url);
 const received = process.argv.slice(2);
 const value = (flag, fallback) =>
@@ -22,7 +23,28 @@ if (received.includes("--strictPort")) {
     ".svg": "image/svg+xml",
     ".woff2": "font/woff2",
   };
+  const { apiOrigin } = JSON.parse(
+    await readFile("infrastructure/sites/deployment.json", "utf8"),
+  );
+  const gateway = createGateway({
+    apiOrigin,
+    assets: () => new Response("Not found", { status: 404 }),
+  });
   const server = createServer(async (request, response) => {
+    if (request.url.startsWith("/api/v1/")) {
+      const url = new URL(request.url, `http://${request.headers.host}`);
+      const result = await gateway(
+        new Request(url, {
+          method: request.method,
+          headers: request.headers,
+          body: ["GET", "HEAD"].includes(request.method) ? undefined : request,
+          duplex: "half",
+        }),
+      );
+      response.writeHead(result.status, Object.fromEntries(result.headers));
+      response.end(Buffer.from(await result.arrayBuffer()));
+      return;
+    }
     if (!["GET", "HEAD"].includes(request.method)) {
       response.writeHead(405);
       response.end();
