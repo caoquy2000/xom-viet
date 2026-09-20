@@ -22,7 +22,7 @@ Chọn repo `caoquy2000/xom-viet`, root `/apps/api`, Dockerfile `Dockerfile`. Pr
 | Variables   | `RAILS_ENV=production`, `API_HOST`, `WEB_ORIGINS`, `DATABASE_URL`, `REDIS_URL`, `SECRET_KEY_BASE` |
 | Storage     | `STORAGE_SERVICE=local`, persistent volume `/app/storage`                                         |
 
-`DATABASE_URL` và `REDIS_URL` tham chiếu credentials do Railway quản lý. PostgreSQL 17 dùng volume `/var/lib/postgresql/data`, `PGDATA=/var/lib/postgresql/data/pgdata`. Redis 7 bật AOF và requirepass; database không có public domain/TCP proxy. Docker entrypoint khởi tạo quyền volume rồi chạy bằng user `xom`.
+`DATABASE_URL` và `REDIS_URL` tham chiếu credentials do Railway quản lý. PostgreSQL 18 dùng volume `/var/lib/postgresql/data`, `PGDATA=/var/lib/postgresql/data/pgdata`. Redis 7 bật AOF và requirepass; database không có public domain/TCP proxy. Docker entrypoint khởi tạo quyền volume rồi chạy bằng user `xom`.
 
 `WEB_ORIGINS` phải khớp origin web HTTPS chính xác. Không thêm wildcard. `/up` được miễn kiểm tra Host để probe nội bộ hoạt động; các API khác vẫn kiểm tra Host.
 
@@ -45,3 +45,5 @@ Migration chạy trước khi đưa API mới nhận traffic. Dùng migration t�
 Persistent volume hiện phù hợp một instance Rails. Trước khi tăng replicas, chuyển Active Storage sang S3-compatible storage dùng chung; deploy Sidekiq worker riêng với cùng storage. Cấu hình worker/outbox relay trong `compose.yml` phục vụ phát triển; chúng cần được cấp phát riêng khi bật xử lý ảnh nền hoặc gửi sự kiện trên môi trường live. Chưa có production worker/relay trong lần triển khai tài khoản này.
 
 Chưa có xác minh email, khôi phục mật khẩu, APK/IPA, benchmark tải hay quy trình backup tự động. Những mục này là bước tiếp theo trước khi mở cộng đồng rộng rãi.
+
+PostgreSQL live dùng template Railway `postgres-ssl:18`; CI chạy PostgreSQL 18 tương ứng. `compose.yml` vẫn dùng PostgreSQL 17 cho môi trường phát triển hiện có. Không hạ major version trên volume đã khởi tạo.
