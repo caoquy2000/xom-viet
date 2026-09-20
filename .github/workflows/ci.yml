@@ -1,0 +1,49 @@
+name: Xom checks
+on: [push, pull_request]
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: node scripts/check-ruby.mjs
+      - run: npm run build
+  rails:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_USER: xom, POSTGRES_PASSWORD: xom, POSTGRES_DB: xom_test }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      RAILS_ENV: test
+      TEST_DATABASE_URL: postgresql://xom:xom@localhost:5432/xom_test
+      REDIS_URL: redis://localhost:6379/0
+    defaults:
+      run: { working-directory: apps/api }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with: { ruby-version: '3.4', bundler-cache: true, working-directory: apps/api }
+      - run: bundle exec rails db:prepare
+      - run: bundle exec rails zeitwerk:check
+      - run: ruby test/domain_contract.rb
+      - run: bundle exec rails test
+      - run: bundle exec brakeman --no-pager
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci --prefix apps/mobile
+      - run: npm run typecheck --prefix apps/mobile
+      - run: npx expo export --platform android --output-dir dist-check
+        working-directory: apps/mobile

@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "name": "Xóm", "slug": "xom-viet", "version": "0.1.0", "orientation": "portrait", "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "vn.xom.community" },
+    "android": { "package": "vn.xom.community", "edgeToEdgeEnabled": true },
+    "plugins": ["expo-secure-store"]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": { "strict": true, "paths": { "@xom/api-client": ["../../packages/api-client/src/index.ts"] } },
+  "include": ["**/*.ts", "**/*.tsx", "../../packages/api-client/src/**/*.ts"]
+}

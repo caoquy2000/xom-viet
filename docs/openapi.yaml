@@ -1,0 +1,668 @@
+openapi: 3.0.3
+info:
+  title: Xóm Community API
+  version: 0.1.0
+  description: 'REST v1. Browser mutation phải có Origin trong WEB_ORIGINS. Native
+    request không có Origin cần X-Xom-Client: native và Bearer token sau đăng nhập.
+    API health /up ở ngoài prefix. POST create/comment chưa có idempotency key. Tránh
+    tự động retry POST sau timeout.'
+servers:
+- url: http://localhost:3001/api/v1
+  description: Local development
+security:
+- cookieAuth: []
+- bearerAuth: []
+tags:
+- name: Identity
+- name: Publishing
+- name: Engagement
+- name: Moderation
+paths:
+  /users:
+    post:
+      summary: Đăng ký tài khoản thành viên
+      tags:
+      - Identity
+      responses:
+        '201':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResult'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - password
+              - name
+              properties:
+                email: &id001
+                  type: string
+                  format: email
+                password: &id002
+                  type: string
+                  minLength: 12
+                  maxLength: 72
+                client: &id003
+                  type: string
+                  enum:
+                  - web
+                  - mobile
+                  default: web
+                name:
+                  type: string
+                  minLength: 2
+                  maxLength: 40
+  /sessions:
+    post:
+      summary: Đăng nhập, tạo session có thể thu hồi
+      tags:
+      - Identity
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResult'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - email
+              - password
+              properties:
+                email: *id001
+                password: *id002
+                client: *id003
+  /session:
+    delete:
+      summary: Đăng xuất và thu hồi session hiện tại
+      tags:
+      - Identity
+      responses:
+        '204':
+          description: Thành công
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /me:
+    get:
+      summary: Hồ sơ của phiên hiện tại
+      tags:
+      - Identity
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /topics:
+    get:
+      summary: Danh sách chủ đề theo thứ tự
+      tags:
+      - Publishing
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Topic'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+  /posts:
+    get:
+      summary: Bảng tin với signed cursor, tối đa 20 bài/trang
+      tags:
+      - Publishing
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedPage'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+      parameters:
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - hot
+          - top
+          - new
+          default: hot
+      - name: period
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - day
+          - week
+          default: all
+      - name: topic
+        in: query
+        schema: &id004
+          type: string
+      - name: query
+        in: query
+        schema:
+          type: string
+          maxLength: 100
+      - name: saved
+        in: query
+        schema:
+          type: boolean
+          default: false
+      - name: cursor
+        in: query
+        schema: *id004
+    post:
+      summary: Đăng bài; tạo post và outbox cùng transaction
+      tags:
+      - Publishing
+      responses:
+        '201':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - title
+              - topic_slug
+              properties:
+                title: &id005
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                body: &id006
+                  type: string
+                  maxLength: 5000
+                topic_slug: *id004
+                image_url:
+                  type: string
+                  format: uri
+                  pattern: ^https://
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - title
+              - topic_slug
+              properties:
+                title: *id005
+                body: *id006
+                topic_slug: *id004
+                image:
+                  type: string
+                  format: binary
+                  description: JPEG/PNG/WebP/GIF, tối đa 8 MB.
+  /posts/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      summary: Chi tiết bài published
+      tags:
+      - Publishing
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+    delete:
+      summary: Soft delete bài của chính người đăng
+      tags:
+      - Publishing
+      responses:
+        '204':
+          description: Thành công
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /posts/{post_id}/vote:
+    parameters:
+    - name: post_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    put:
+      summary: Đặt giá trị vote tuyệt đối; 0 để bỏ vote; retry idempotent
+      tags:
+      - Engagement
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - value
+              properties:
+                value:
+                  type: integer
+                  enum:
+                  - -1
+                  - 0
+                  - 1
+  /posts/{post_id}/bookmark:
+    parameters:
+    - name: post_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    put:
+      summary: Lưu bài idempotent
+      tags:
+      - Engagement
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Bỏ lưu bài idempotent
+      tags:
+      - Engagement
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /posts/{post_id}/comments:
+    parameters:
+    - name: post_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      summary: Tối đa 100 bình luận đầu theo thời gian; chưa phân trang
+      tags:
+      - Engagement
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security: []
+    post:
+      summary: Đăng bình luận; tăng counter cùng transaction
+      tags:
+      - Engagement
+      responses:
+        '201':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - body
+              properties:
+                body:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+  /posts/{post_id}/reports:
+    parameters:
+    - name: post_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    post:
+      summary: Gửi hoặc cập nhật báo cáo của chính người dùng
+      tags:
+      - Moderation
+      responses:
+        '201':
+          description: Thành công
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - reason
+              properties:
+                reason:
+                  type: string
+                  enum:
+                  - spam
+                  - harassment
+                  - unsafe
+                  - copyright
+  /admin/reports:
+    get:
+      summary: 'Moderator/admin: tối đa 100 báo cáo pending'
+      tags:
+      - Moderation
+      responses:
+        '200':
+          description: Thành công
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: *id004
+                    post_id: *id004
+                    reason: *id004
+                    created_at:
+                      type: string
+                      format: date-time
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /admin/reports/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      summary: 'Moderator/admin: ẩn bài hoặc bỏ qua báo cáo'
+      tags:
+      - Moderation
+      responses:
+        '204':
+          description: Thành công
+        default:
+          description: Lỗi có cấu trúc
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - resolution
+              properties:
+                resolution:
+                  type: string
+                  enum:
+                  - hide
+                  - dismiss
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: xom_session
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Opaque session token, không phải JWT.
+  schemas:
+    User:
+      type: object
+      required:
+      - id
+      - name
+      - username
+      - avatar
+      properties:
+        id: *id004
+        name: *id004
+        username: *id004
+        avatar: *id004
+    Post:
+      type: object
+      required:
+      - id
+      - title
+      - body
+      - imageUrl
+      - topicSlug
+      - author
+      - createdAt
+      - score
+      - commentCount
+      - viewerVote
+      - saved
+      - tags
+      properties:
+        id: *id004
+        title: *id004
+        body: *id004
+        imageUrl:
+          type: string
+          nullable: true
+        topicSlug: *id004
+        author:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+        score:
+          type: integer
+        commentCount:
+          type: integer
+        viewerVote:
+          type: integer
+          enum:
+          - -1
+          - 0
+          - 1
+        saved:
+          type: boolean
+        tags:
+          type: array
+          items: *id004
+    Comment:
+      type: object
+      required:
+      - id
+      - body
+      - author
+      - createdAt
+      properties:
+        id: *id004
+        body: *id004
+        author:
+          $ref: '#/components/schemas/User'
+        createdAt:
+          type: string
+          format: date-time
+    Topic:
+      type: object
+      required:
+      - slug
+      - name
+      - emoji
+      - description
+      properties:
+        slug: *id004
+        name: *id004
+        emoji: *id004
+        description: *id004
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code: *id004
+            message: *id004
+        requestId: *id004
+    FeedPage:
+      type: object
+      required:
+      - data
+      - nextCursor
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Post'
+        nextCursor:
+          type: string
+          nullable: true
+    SessionResult:
+      type: object
+      required:
+      - user
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        token:
+          type: string
+          description: Chỉ trả cho client=mobile; web nhận cookie HttpOnly.

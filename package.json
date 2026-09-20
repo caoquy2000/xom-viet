@@ -1,0 +1,26 @@
+{
+  "name": "xom",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "packages/api-client"
+  ],
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --workspace @xom/web && node scripts/export-web.mjs",
+    "typecheck": "npm run typecheck --workspace @xom/web",
+    "test": "node --import tsx --test packages/api-client/test/*.test.ts",
+    "mobile": "npm --prefix apps/mobile start",
+    "check:ruby": "node scripts/check-ruby.mjs"
+  },
+  "devDependencies": {
+    "@ruby/prism": "^1.9.0",
+    "prettier": "^3.9.8",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+.env
+.env.local
+.env.*.local
+.sites-runtime/
+*.tsbuildinfo
+apps/api/log/*
+apps/api/tmp/*
+apps/api/storage/*
+apps/api/vendor/bundle/
+apps/mobile/.expo/
+coverage/
+apps/mobile/dist-check/

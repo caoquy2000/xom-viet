@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+require_relative "../config/environment"
+loop do
+  begin
+    Platform::RelayOutboxJob.perform_now
+  rescue StandardError => error
+    Rails.logger.error("outbox_delivery_failed class=#{error.class}")
+  end
+  sleep 5
+end

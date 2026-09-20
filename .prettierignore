@@ -1,0 +1,10 @@
+node_modules
+**/node_modules
+**/.next
+**/out
+out
+apps/mobile/dist-check
+package-lock.json
+**/package-lock.json
+**/*.jpg
+**/*.png

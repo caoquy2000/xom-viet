@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: xom
+      POSTGRES_PASSWORD: xom
+      POSTGRES_DB: xom_development
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: ["postgres_data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xom -d xom_development"]
+      interval: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+  api:
+    build: ./apps/api
+    environment: &api_environment
+      RAILS_ENV: development
+      DATABASE_URL: postgresql://xom:xom@postgres:5432/xom_development
+      TEST_DATABASE_URL: postgresql://xom:xom@postgres:5432/xom_test
+      REDIS_URL: redis://redis:6379/0
+      WEB_ORIGINS: ${WEB_ORIGINS:-http://localhost:4173}
+      API_HOST: ${API_HOST:-localhost}
+    command: sh -c "bundle exec rails db:prepare && bundle exec rails server -b 0.0.0.0 -p 3001"
+    ports: ["3001:3001"]
+    volumes: ["media_data:/app/storage"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "ruby", "-rnet/http", "-e", "exit(Net::HTTP.get_response(URI('http://localhost:3001/up')).code == '200' ? 0 : 1)"]
+      interval: 10s
+      retries: 15
+  worker:
+    build: ./apps/api
+    environment: *api_environment
+    command: bundle exec sidekiq -c 5 -q default -q active_storage_analysis -q active_storage_purge -q events
+    volumes: ["media_data:/app/storage"]
+    depends_on:
+      api: { condition: service_healthy }
+  relay:
+    build: ./apps/api
+    profiles: ["events"]
+    environment:
+      <<: *api_environment
+      EVENTS_WEBHOOK_URL: ${EVENTS_WEBHOOK_URL:-}
+      EVENTS_WEBHOOK_SECRET: ${EVENTS_WEBHOOK_SECRET:-}
+    command: ruby bin/outbox-relay
+    depends_on:
+      api: { condition: service_healthy }
+volumes:
+  postgres_data:
+  redis_data:
+  media_data:
