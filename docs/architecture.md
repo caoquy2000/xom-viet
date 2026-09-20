@@ -22,7 +22,7 @@ flowchart TB
   API --> Q["Redis / Sidekiq"]
 ```
 
-Sơ đồ mô tả cấu trúc trong mã và cấu hình. PostgreSQL/Redis/S3/Rails chưa được cấp phát trên một môi trường production trong bản bàn giao. Web xem trước dùng demo adapter in-memory, không kết nối Rails.
+Web được build bằng Next.js và phục vụ trên Sites. Cổng HTTP cùng origin chuyển `/api/v1/*` tới Rails trên Railway. PostgreSQL và Redis dùng mạng nội bộ Railway. Active Storage dùng persistent volume cho một instance API; S3 là adapter có sẵn cho bước scale tiếp theo.
 
 ## 2. Quyền sở hữu dữ liệu
 
@@ -55,11 +55,24 @@ flowchart TB
 | Open/closed | Thay HTTP/demo adapter qua `CommunityApi`; thay adapter sự kiện mà không sửa nghiệp vụ |
 | Liskov substitution | Adapter có cùng signature và kiểu kết quả; bộ test HTTP và demo kiểm tra các hành vi quan trọng; demo được đánh dấu rõ, không giả lập đầy đủ production |
 | Interface segregation | Use case chỉ nhận port nhỏ nó cần; `CreatePost` nhận repository/events/transaction; `CastVote` nhận repository/events |
-| Dependency inversion | Constructor injection; hai use case lõi không gọi Rails/ActiveRecord; adapter nằm bên ngoài |
+| Dependency inversion | Constructor injection; use case phụ thuộc port được truyền vào; composition root lắp adapter Rails/ActiveRecord; adapter nằm bên ngoài |
 
 Ruby dùng duck typing có kiểm thử; không tạo abstract base class/repository rỗng cho mỗi model. Các thao tác CRUD đơn giản giữ Rails idiom. Tách lớp khi có quy tắc hoặc phụ thuộc cần cô lập, tránh một service khổng lồ và tránh tạo lớp chỉ để chuyển tiếp một dòng.
 
-Web đặt state/truy vấn ở `features/community/use-community.ts`, card ở `post-card.tsx`, primitive modal ở `components/modal.tsx`, HTTP ở shared package. Mobile có API composition riêng, SecureStore và UI native. UI MVP còn có thể tách thêm form và screen khi mở rộng; backend domain không phụ thuộc những thay đổi đó.
+Web và mobile chia theo tính năng. Mỗi form sở hữu input, validation và trạng thái gửi; screen điều phối, layout/card nhận props và không tự tạo HTTP client.
+
+| Tầng | Web | Mobile | Phụ thuộc |
+| --- | --- | --- | --- |
+| Composition root | `providers/client-provider.tsx` | `src/providers/app-provider.tsx` | Chọn adapter và lắp `SessionStore` |
+| Auth | `features/auth/auth-dialog.tsx` | `src/features/auth/auth-form.tsx` | `AuthApi`, store và validation dùng chung |
+| Feed | `features/community` | `src/features/community` | `FeedApi`, query state, component trình bày |
+| Đăng bài | `features/publishing` | `src/features/publishing` | `PublishingApi` |
+| Tương tác | `features/engagement` | `src/features/engagement` | Các phương thức nhỏ của `EngagementApi` |
+| Layout/UI | `components/layout`, `components/modal.tsx` | `src/ui` | Props và callbacks |
+
+`SessionStore` độc lập với React, cookie và SecureStore. Revision của phiên vô hiệu hóa feed và dialog thuộc người dùng trước. Kết quả request cũ không được ghi đè phiên mới; đăng nhập/đăng xuất không chạy đồng thời. Khi logout thất bại mạng, UI giữ trạng thái đăng nhập để người dùng thử lại. HTTP 401 xóa credential native; lỗi 5xx không bị coi là logout.
+
+Rails Identity có `RegisterAccount` và `SignIn`, nhận user repository, session repository, password verifier và transaction. `Identity::Commands` là composition root. Controller chỉ đọc tham số, gọi use case và trả cookie/JSON qua `SessionResponse`. Tạo user và phiên là một transaction; đăng nhập lại xoay phiên hiện tại, không đăng xuất các thiết bị khác.
 
 ## 4. Tính đúng khi nhiều người thao tác
 
@@ -82,7 +95,7 @@ Web đặt state/truy vấn ở `features/community/use-community.ts`, card ở 
 
 ## 6. Auth, quyền và dữ liệu người dùng
 
-Session token ngẫu nhiên 48 bytes; DB chỉ lưu SHA-256 digest; thời hạn 30 ngày; logout thu hồi bản ghi. Web dùng cookie HttpOnly/Secure ở production, SameSite=Lax. Browser write kiểm tra Origin trong allowlist, bao gồm cả login. Native dùng Bearer token trong SecureStore, header xác định client và không dùng cookie; Origin lạ vẫn bị từ chối dù có header native.
+Đăng ký kiểm tra tên, email chuẩn hóa, mật khẩu tối thiểu 12 ký tự, tối đa 72 UTF-8 bytes và nhập lại mật khẩu. BCrypt lưu hash; đăng nhập email không tồn tại vẫn chạy kiểm tra digest giả. Session token ngẫu nhiên 48 bytes; DB chỉ lưu SHA-256 digest; thời hạn 30 ngày; logout thu hồi bản ghi. Web dùng cookie HttpOnly/Secure ở production, SameSite=Lax. Browser write kiểm tra Origin trong allowlist, bao gồm cả login. Native dùng Bearer token trong SecureStore, header xác định client và không dùng cookie; Origin lạ vẫn bị từ chối dù có header native.
 
 Production đặt web và API trong cùng site, ví dụ `xom.vn` và `api.xom.vn`, hoặc dùng reverse proxy `/api`. Cookie Lax không hỗ trợ tùy ý hai domain khác site; nếu cần điều đó phải thiết kế BFF hoặc chính sách cookie/CSRF riêng. Không lưu access token web trong localStorage.
 
@@ -108,6 +121,6 @@ Chưa có load test nên không gán số người dùng hay RPS được hỗ t
 - ADR-002: REST versioned + shared TypeScript contracts; không chia sẻ Rails model với client.
 - ADR-003: Browser session bằng cookie; native session bằng SecureStore.
 - ADR-004: Post, vote và outbox dùng transaction cục bộ; event giao ít nhất một lần.
-- ADR-005: Bản preview static Next.js dùng demo adapter rõ ràng; Rails/Sidekiq triển khai trên môi trường hỗ trợ Ruby riêng. Sites không chạy Rails.
+- ADR-005: Next.js static + gateway trên Sites; Rails trên Railway. Gateway chỉ chuyển tiếp HTTP và cookie `xom_session`, không gửi cookie/identity của Sites sang Rails. Mobile dùng Rails trực tiếp. Local demo là adapter được chọn rõ ràng tại composition root.
 
 Tài liệu tham khảo: [Rails API](https://guides.rubyonrails.org/api_app.html), [Rails locking](https://api.rubyonrails.org/classes/ActiveRecord/Locking/Pessimistic.html), [Next.js documentation](https://nextjs.org/docs), [Expo SecureStore](https://docs.expo.dev/versions/latest/sdk/securestore/). Quyết định kiến trúc trong tài liệu là thiết kế của dự án, không phải bảo đảm hiệu năng từ các nguồn tham khảo.

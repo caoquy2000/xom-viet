@@ -8,9 +8,9 @@
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm run build --workspace @xom/web && node scripts/export-web.mjs",
+    "build": "node scripts/build-web.mjs",
     "typecheck": "npm run typecheck --workspace @xom/web",
-    "test": "node --import tsx --test packages/api-client/test/*.test.ts",
+    "test": "node --import tsx --test packages/api-client/test/*.test.ts infrastructure/sites/*.test.mjs",
     "mobile": "npm --prefix apps/mobile start",
     "check:ruby": "node scripts/check-ruby.mjs"
   },

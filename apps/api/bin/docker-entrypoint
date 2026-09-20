@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+# A fresh Railway volume is mounted as root. Initialize ownership, then drop
+# privileges before running either a migration or the application server.
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p /app/storage /app/tmp/pids /app/log
+  chown -R xom:xom /app/storage /app/tmp /app/log
+  exec gosu xom "$@"
+fi
+exec "$@"

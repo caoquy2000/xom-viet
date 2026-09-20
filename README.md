@@ -2,7 +2,7 @@
 
 MVP khởi đầu cho sản phẩm lấy cảm hứng từ trải nghiệm bảng tin của 9GAG, có thương hiệu và nội dung minh họa riêng. Backend **Ruby on Rails**, web **Next.js**, mobile **React Native / Expo**, dùng chung hợp đồng API bằng TypeScript.
 
-**Bản xem trước hiện chạy chế độ demo trong bộ nhớ. Rails API đã có mã nguồn nhưng chưa được triển khai. Đây chưa phải một mạng xã hội production.** Bài đăng và tương tác demo mất khi tải lại trang hoặc khởi động lại ứng dụng. Không nhập dữ liệu cá nhân thật vào bản minh họa.
+**Tài khoản thật được xử lý bằng Rails và lưu trong PostgreSQL.** Bản triển khai sử dụng Next.js qua cổng API cùng origin; mobile kết nối Rails trực tiếp. Chế độ demo trong bộ nhớ chỉ dùng khi chạy local mà không đặt biến API. Xem [kiến trúc](docs/architecture.md), [triển khai](docs/deployment.md) và [kết quả kiểm thử](docs/verification.md).
 
 ## Điểm bắt đầu
 
@@ -11,7 +11,8 @@ MVP khởi đầu cho sản phẩm lấy cảm hứng từ trải nghiệm bản
 | `apps/api` | Rails API; PostgreSQL; xác thực; nghiệp vụ; kiểm duyệt; outbox |
 | `apps/web` | Next.js + React + TypeScript; feed và các luồng cộng đồng |
 | `apps/mobile` | React Native / Expo; feed, đăng nhập, đăng bài, bình luận, lưu bài |
-| `packages/api-client` | Kiểu dữ liệu, interface `CommunityApi`, HTTP adapter và demo adapter |
+| `packages/api-client` | Hợp đồng theo tính năng, HTTP/demo adapters, SessionStore và validation |
+| `infrastructure/sites` | Reverse proxy cùng origin; không chứa nghiệp vụ hoặc mật khẩu |
 | `docs/architecture.md` | Ranh giới module, SOLID, dữ liệu, concurrency, lộ trình microservices |
 | `docs/openapi.yaml` | Hợp đồng REST API v1 |
 | `docs/verification.md` | Những gì đã kiểm tra và những gì chưa thể xác nhận |
@@ -35,7 +36,7 @@ npm run check:ruby
 npm run build
 ```
 
-`check:ruby` dùng Prism để kiểm tra cú pháp; không thay thế kiểm thử Rails. Mặc định web xuất file tĩnh vào `out/`. `WEB_OUTPUT=server` cho phép build Next.js để triển khai bằng Node, tuy nhiên chưa có SSR feed hoặc trang SEO riêng cho từng bài.
+`check:ruby` dùng Prism để kiểm tra cú pháp; không thay thế kiểm thử Rails. `npm run build` xuất Next.js vào `out/`, đóng gói tài nguyên và cổng API vào `dist/` để publish. Bản build này luôn dùng Rails qua `/api/v1`, kể cả khi API tạm thời lỗi. `WEB_OUTPUT=server` cho phép build Next.js để triển khai bằng Node, tuy nhiên chưa có SSR feed hoặc trang SEO riêng cho từng bài.
 
 ## Chạy Rails API bằng Docker
 
@@ -66,7 +67,7 @@ docker compose exec -e RAILS_ENV=test api bundle exec rails zeitwerk:check
 docker compose exec -e RAILS_ENV=test api bundle exec rails test
 ```
 
-Chạy Rails trực tiếp cũng được: cài Ruby 3.4, PostgreSQL 17, Redis 7, vào `apps/api`, `bundle install`, xuất các biến môi trường, rồi `bundle exec rails db:prepare` và `bundle exec rails s -p 3001`. Rails không tự đọc `.env.example`; dùng shell hoặc cơ chế quản lý secret của nơi triển khai. Chốt `Gemfile.lock` sau lần `bundle install` đầu tiên và commit nó trước khi triển khai thực tế.
+Chạy Rails trực tiếp cũng được: cài Ruby 3.4, PostgreSQL 17, Redis 7, vào `apps/api`, `bundle install`, xuất các biến môi trường, rồi `bundle exec rails db:prepare` và `bundle exec rails s -p 3001`. Rails không tự đọc `.env.example`; dùng shell hoặc cơ chế quản lý secret của nơi triển khai. `Gemfile.lock` đã được commit và kiểm tra trong CI. JSON được giới hạn ở major 2 vì Rails 8.1 chưa tương thích thay đổi tham số của JSON 3.
 
 ## Chạy mobile
 
@@ -101,6 +102,6 @@ Mã mobile có đăng bài văn bản hoặc liên kết ảnh HTTPS. Chọn ả
 
 ## Trước khi mở cộng đồng thật
 
-Chạy toàn bộ kiểm thử Rails và kiểm thử tích hợp web/mobile với PostgreSQL thật; khóa phiên bản gem; thiết lập domain HTTPS và cookie cùng site; bổ sung khôi phục mật khẩu/xác minh email, quy trình kiểm duyệt, xóa/purge ảnh khỏi CDN, backup/restore và theo dõi lỗi. Thêm phân trang bình luận, trang chi tiết có SSR/SEO, pipeline xử lý ảnh/video và kiểm thử tải theo nhu cầu. Các hạng mục này có trong lộ trình, chưa được quảng cáo là đã hoạt động.
+Bổ sung khôi phục mật khẩu/xác minh email, quy trình kiểm duyệt, xóa/purge ảnh khỏi CDN, backup/restore và theo dõi lỗi. Thêm phân trang bình luận, trang chi tiết có SSR/SEO, pipeline xử lý ảnh/video và kiểm thử tải theo nhu cầu. Các hạng mục này có trong lộ trình, chưa được quảng cáo là đã hoạt động.
 
 Thiết kế gốc tham khảo: [9GAG Top](https://9gag.com/top). Hướng dẫn nền tảng: [Rails API-only](https://guides.rubyonrails.org/api_app.html), [Next.js](https://nextjs.org/docs), [Expo](https://docs.expo.dev/). Ảnh minh họa và giấy phép tại `docs/assets.md`.
