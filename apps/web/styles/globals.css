@@ -1574,3 +1574,20 @@ button svg {
     font-size: 12px;
   }
 }
+
+/* Account controls share the established Xóm spacing and colour tokens. */
+.feed-surface { min-width: 0; }
+.feed-surface .feed-column { width: 100%; }
+.account-controls { display: flex; align-items: center; gap: .5rem; }
+.account-name { display: flex; align-items: center; gap: .5rem; max-width: 11rem; font-size: .875rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-name > span { font-size: 1.4rem; }
+.register-button { display: inline-flex; align-items: center; gap: .4rem; border: 1px solid #dedbd0; border-radius: .6rem; padding: .6rem .8rem; background: white; font-size: .875rem; font-weight: 600; }
+.password-input { display: flex; align-items: center; border: 1px solid #ddd9cd; border-radius: .6rem; background: white; }
+.form-field .password-input input { border: 0; background: transparent; min-width: 0; }
+.password-input:focus-within { outline: 2px solid #ac8e22; outline-offset: 2px; }
+.password-input input:focus-visible { outline: none; }
+.form-help { margin: -.4rem 0 1rem; font-size: .875rem; color: #66635a; }
+.session-notice { padding: 1rem; background: #fff3dc; font-size: .875rem; border-radius: .75rem; margin-bottom: 1rem; }
+.session-notice button { margin-left: .5rem; text-decoration: underline; }
+@media(max-width: 720px) { .brand-subtitle, .register-button { display: none; } .account-name { max-width: 6rem; } }
+@media(max-width: 420px) { .account-name { max-width: 4rem; } }

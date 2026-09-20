@@ -1,6 +1,7 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
   before_action :verify_browser_origin
+  after_action :prevent_private_response_caching
   rescue_from ActiveRecord::RecordNotFound do
     render_error("not_found", "Không tìm thấy nội dung.", :not_found)
   end
@@ -15,6 +16,9 @@ class ApplicationController < ActionController::API
   end
   rescue_from ActionController::ParameterMissing do |error|
     render_error("missing_parameter", "Thiếu thông tin: #{error.param}", :bad_request)
+  end
+  rescue_from Identity::InvalidCredentials do |error|
+    render_error(error.code, error.message, :unauthorized)
   end
 
   private
@@ -39,7 +43,7 @@ class ApplicationController < ActionController::API
   def verify_browser_origin
     return if request.get? || request.head? || request.options?
     origin = request.headers["Origin"]
-    allowed = ENV.fetch("WEB_ORIGINS", "http://localhost:4173").split(",")
+    allowed = ENV.fetch("WEB_ORIGINS", "http://localhost:4173").split(",").map(&:strip)
     if origin.present?
       return if allowed.include?(origin)
     elsif request.headers["X-Xom-Client"] == "native" && cookies[:xom_session].blank?
@@ -49,6 +53,10 @@ class ApplicationController < ActionController::API
   end
   def render_error(code, message, status)
     render json: { error: { code: code, message: message }, requestId: request.request_id }, status: status
+  end
+  def prevent_private_response_caching
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
   end
   def render_post(post)
     render json: Publishing::PostPresenter.batch([post], viewer_id: current_user&.id, url_context: self).first

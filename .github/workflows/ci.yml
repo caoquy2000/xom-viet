@@ -32,10 +32,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1
         with: { ruby-version: '3.4', bundler-cache: true, working-directory: apps/api }
+      - name: Record resolved dependency lock
+        run: ruby -rbase64 -e 'puts "XOM_GEMFILE_LOCK=#{Base64.strict_encode64(File.read("Gemfile.lock"))}"'
       - run: bundle exec rails db:prepare
       - run: bundle exec rails zeitwerk:check
       - run: ruby test/domain_contract.rb
-      - run: bundle exec rails test
+      - run: bundle exec rails test --backtrace
       - run: bundle exec brakeman --no-pager
   mobile:
     runs-on: ubuntu-latest

@@ -7,15 +7,15 @@ class CommunityTest < ActionDispatch::IntegrationTest
     assert_response :unauthorized
     headers = native_headers(create_user)
     assert_difference "Platform::OutboxEvent.count", 1 do
-      2.times { put endpoint, params: { value: 1 }, headers: headers, as: :json; assert_response :success }
+      2.times { put endpoint, params: { value: 1 }, headers: headers, as: :json; assert_response :success, response.body }
     end
     assert_equal 1, post_record.reload.score
     assert_equal 1, Engagement::Vote.where(post_id: post_record.id).count
     put endpoint, params: { value: -1 }, headers: headers, as: :json
-    assert_response :success
+    assert_response :success, response.body
     assert_equal(-1, post_record.reload.score)
     put endpoint, params: { value: 0 }, headers: headers, as: :json
-    assert_response :success
+    assert_response :success, response.body
     assert_equal 0, post_record.reload.score
     assert_equal 0, Engagement::Vote.where(post_id: post_record.id).count
   end
@@ -27,7 +27,7 @@ class CommunityTest < ActionDispatch::IntegrationTest
     assert_response :forbidden
     post_record.update!(status: "hidden")
     put "/api/v1/posts/#{post_record.id}/vote", params: { value: 1 }, headers: headers, as: :json
-    assert_response :not_found
+    assert_response :not_found, response.body
     assert_equal 0, post_record.reload.score
   end
 
@@ -42,13 +42,13 @@ class CommunityTest < ActionDispatch::IntegrationTest
   end
 
   test "native registration issues revocable session and never grants a supplied role" do
-    post "/api/v1/users", params: { name: "New Neighbor", email: "neighbor@example.test", password: "test-password-long-enough", role: "admin", client: "mobile" }, headers: { "X-Xom-Client" => "native" }, as: :json
-    assert_response :created
+    post "/api/v1/users", params: { name: "New Neighbor", email: "neighbor@example.test", password: "test-password-long-enough", password_confirmation: "test-password-long-enough", role: "admin", client: "mobile" }, headers: { "X-Xom-Client" => "native" }, as: :json
+    assert_response :created, response.body
     token = response.parsed_body.fetch("token")
     assert_equal "member", Identity::User.find_by!(email: "neighbor@example.test").role
     headers = { "X-Xom-Client" => "native", "Authorization" => "Bearer #{token}" }
     get "/api/v1/me", headers: headers
-    assert_response :success
+    assert_response :success, response.body
     delete "/api/v1/session", headers: headers, as: :json
     assert_response :no_content
     get "/api/v1/me", headers: headers
@@ -59,11 +59,11 @@ class CommunityTest < ActionDispatch::IntegrationTest
     author = create_user
     23.times { create_post(author: author).update!(created_at: 1.hour.ago.change(usec: 0)) }
     get "/api/v1/posts", params: { sort: "new" }
-    assert_response :success
+    assert_response :success, response.body
     first_page = response.parsed_body
     assert_equal 20, first_page.fetch("data").size
     get "/api/v1/posts", params: { sort: "new", cursor: first_page.fetch("nextCursor") }
-    assert_response :success
+    assert_response :success, response.body
     assert_equal 3, response.parsed_body.fetch("data").size
     assert_empty first_page.fetch("data").map { |p| p["id"] } & response.parsed_body.fetch("data").map { |p| p["id"] }
     get "/api/v1/posts", params: { sort: "top", cursor: first_page.fetch("nextCursor") }

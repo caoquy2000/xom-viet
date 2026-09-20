@@ -127,18 +127,35 @@ export class HttpCommunityApi implements CommunityApi {
   signIn(email: string, password: string) {
     return this.authenticate("/sessions", { email, password });
   }
-  signUp(name: string, email: string, password: string) {
-    return this.authenticate("/users", { name, email, password });
+  signUp(
+    name: string,
+    email: string,
+    password: string,
+    passwordConfirmation?: string,
+  ) {
+    return this.authenticate("/users", {
+      name,
+      email,
+      password,
+      password_confirmation: passwordConfirmation ?? password,
+    });
   }
   async signOut() {
-    await this.request("/session", { method: "DELETE" });
+    try {
+      await this.request("/session", { method: "DELETE" });
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 401)) throw error;
+    }
     await this.tokens?.set(null);
   }
   async currentUser() {
     try {
       return await this.request<User>("/me");
     } catch (e) {
-      if (e instanceof ApiError && e.status === 401) return null;
+      if (e instanceof ApiError && e.status === 401) {
+        await this.tokens?.set(null);
+        return null;
+      }
       throw e;
     }
   }

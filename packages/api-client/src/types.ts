@@ -48,19 +48,33 @@ export type CreatePostInput = {
   imageUrl?: string;
   image?: Blob;
 };
-export interface CommunityApi {
-  readonly mode: "demo" | "live";
+export interface FeedApi {
   topics(): Promise<Topic[]>;
   feed(query?: FeedQuery): Promise<Page<Post>>;
   post(id: string): Promise<Post>;
+}
+export interface PublishingApi {
   createPost(input: CreatePostInput): Promise<Post>;
+}
+export interface EngagementApi {
   vote(id: string, value: VoteValue): Promise<Post>;
   save(id: string, saved: boolean): Promise<Post>;
   comments(id: string): Promise<Comment[]>;
   comment(id: string, body: string): Promise<Comment>;
   report(id: string, reason: string): Promise<void>;
+}
+export interface AuthApi {
   signIn(email: string, password: string): Promise<User>;
-  signUp(name: string, email: string, password: string): Promise<User>;
+  signUp(
+    name: string,
+    email: string,
+    password: string,
+    passwordConfirmation?: string,
+  ): Promise<User>;
   signOut(): Promise<void>;
   currentUser(): Promise<User | null>;
+}
+export interface CommunityApi
+  extends FeedApi, PublishingApi, EngagementApi, AuthApi {
+  readonly mode: "demo" | "live";
 }
