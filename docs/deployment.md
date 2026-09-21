@@ -47,3 +47,7 @@ Persistent volume hiện phù hợp một instance Rails. Trước khi tăng rep
 Chưa có xác minh email, khôi phục mật khẩu, APK/IPA, benchmark tải hay quy trình backup tự động. Những mục này là bước tiếp theo trước khi mở cộng đồng rộng rãi.
 
 PostgreSQL live dùng template Railway `postgres-ssl:18`; CI chạy PostgreSQL 18 tương ứng. `compose.yml` vẫn dùng PostgreSQL 17 cho môi trường phát triển hiện có. Không hạ major version trên volume đã khởi tạo.
+
+## Giới hạn môi trường hiện tại
+
+Railway đang dùng Trial (30 ngày hoặc hết credit còn lại), chưa có đăng ký gói trả phí. Bản live phụ thuộc thời hạn và credit của tài khoản; kiểm tra Billing trước khi mở cho nhiều người dùng. Web giữ nguyên quyền xem owner-only hiện có trên Sites. Tài khoản Xóm và quyền truy cập Site là hai lớp độc lập.
